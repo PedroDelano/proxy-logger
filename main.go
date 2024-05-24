@@ -8,13 +8,20 @@ import (
 )
 
 // Target server URL
-var targetURL = "http://example.com"
+var targetURL = "http://localhost:8000"
 
 // handleRequestAndRedirect handles the incoming request and redirects it to the target server
 func handleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
 
+	// this will join the specific path with the targetURL
+    // Example: 
+    // - targetURL = http://localhost:8000
+    // - req.URL.Path = /api/v1/users
+    // - customURL = http://localhost:8000/api/v1/users
+	customURL := targetURL + req.URL.Path
+
 	// Parse the target URL
-	url, err := url.Parse(targetURL)
+	url, err := url.Parse(customURL)
 	if err != nil {
 		http.Error(res, "Invalid target URL", http.StatusInternalServerError)
 		return
