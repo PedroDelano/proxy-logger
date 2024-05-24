@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"net/http"
@@ -14,10 +15,10 @@ var targetURL = "http://localhost:8000"
 func handleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
 
 	// this will join the specific path with the targetURL
-    // Example: 
-    // - targetURL = http://localhost:8000
-    // - req.URL.Path = /api/v1/users
-    // - customURL = http://localhost:8000/api/v1/users
+	// Example:
+	// - targetURL = http://localhost:8000
+	// - req.URL.Path = /api/v1/users
+	// - customURL = http://localhost:8000/api/v1/users
 	customURL := targetURL + req.URL.Path
 
 	// Parse the target URL
@@ -27,8 +28,16 @@ func handleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Create a new request based on the incoming request
-	proxyReq, err := http.NewRequest(req.Method, url.String(), req.Body)
+	// Read and save the request body
+	reqBody, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(res, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	defer req.Body.Close()
+
+	// Create a new proxy request with the parsed URL and request body
+	proxyReq, err := http.NewRequest(req.Method, url.String(), bytes.NewReader(reqBody))
 	if err != nil {
 		http.Error(res, "Error creating proxy request", http.StatusInternalServerError)
 		return
@@ -54,11 +63,26 @@ func handleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
 	// Write the status code from the target server response
 	res.WriteHeader(proxyRes.StatusCode)
 
+	// Read and save the response body
+	resBody, err := io.ReadAll(proxyRes.Body)
+	if err != nil {
+		http.Error(res, "Error reading response body", http.StatusInternalServerError)
+		return
+	}
+
 	// log the request
 	log.Printf("Request: %s %s %s\n", req.Method, req.URL, req.Proto)
 
-	// Copy the body from the target server response to the proxy response
-	io.Copy(res, proxyRes.Body)
+	// Transform reqBody and resBody into json
+	jsonReqBody := string(reqBody)
+	jsonResBody := string(resBody)
+
+	log.Println("jsonReqBody", jsonReqBody)
+	log.Println("jsonResBody", jsonResBody)
+
+	// Write the response body to the client
+	res.Write(resBody)
+
 }
 
 func main() {
